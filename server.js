@@ -12,7 +12,7 @@ import {
 
 // --- Constants ---
 const PORT = process.env.PORT || 3000;
-const BRIDGE_WS_URL = `wss://localhost:${PORT}/mcp`;
+const BRIDGE_WS_URL = `wss://127.0.0.1:${PORT}/mcp`;
 
 // Fix: Use relative path derived from current file location, not hardcoded user path
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
