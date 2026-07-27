@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iOS BLE-MCP Bridge</title>
+  
+  <!-- Modern Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Beacio SDK CDN -->
+  <script src="https://beacio.com/beacio.js"></script>
+
+  <style>
+    :root {
+      --bg-color: #0d0f14;
+      --card-bg: rgba(22, 26, 37, 0.6);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #007aff;
+      --primary-glow: rgba(0, 122, 255, 0.4);
+      --accent: #ff2d55;
+      --text: #f5f5f7;
+      --text-muted: #8e8e93;
+      --success: #34c759;
+      --warning: #ff9500;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      overflow-x: hidden;
+      background-image: radial-gradient(circle at 10% 20%, rgba(0, 122, 255, 0.15) 0%, transparent 40%),
+                        radial-gradient(circle at 90% 80%, rgba(255, 45, 85, 0.1) 0%, transparent 40%);
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Glass Card */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 30px 24px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      transition: transform 0.3s ease;
+    }
+
+    header {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-container {
+      position: relative;
+      width: 70px;
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .logo-glow {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: var(--primary);
+      filter: blur(15px);
+      opacity: 0.2;
+      z-index: -1;
+    }
+
+    .logo-svg {
+      width: 40px;
+      height: 40px;
+      fill: var(--primary);
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #ffffff 0%, #a1a1a6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Status Indicators */
+    .status-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      padding: 16px;
+      border-radius: 16px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+
+    .status-label {
+      color: var(--text-muted);
+    }
+
+    .status-value {
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--text-muted);
+      display: inline-block;
+    }
+
+    .status-dot.active {
+      background-color: var(--success);
+      box-shadow: 0 0 10px var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    .status-dot.pending {
+      background-color: var(--warning);
+      box-shadow: 0 0 10px var(--warning);
+    }
+
+    .status-dot.inactive {
+      background-color: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    /* Activity Log */
+    .log-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .log-header {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .log-list {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      border-radius: 16px;
+      height: 150px;
+      overflow-y: auto;
+      padding: 12px;
+      font-family: 'Space Grotesk', monospace;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .log-item {
+      line-height: 1.4;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+      padding-bottom: 4px;
+    }
+
+    .log-time {
+      color: var(--text-muted);
+      margin-right: 6px;
+    }
+
+    .log-tag {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      margin-right: 6px;
+      display: inline-block;
+    }
+
+    .log-tag.in {
+      background: rgba(0, 122, 255, 0.2);
+      color: var(--primary);
+    }
+
+    .log-tag.out {
+      background: rgba(52, 199, 89, 0.2);
+      color: var(--success);
+    }
+
+    .log-tag.err {
+      background: rgba(255, 45, 85, 0.2);
+      color: var(--accent);
+    }
+
+    /* Overlay / Permission Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(5, 7, 10, 0.85);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background: #1c1c1e;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 30px 24px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      transform: scale(0.9);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-overlay.show .modal {
+      transform: scale(1);
+    }
+
+    .modal-icon {
+      font-size: 48px;
+      animation: bounce 2s infinite;
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .modal-text {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 16px;
+      border-radius: 16px;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px var(--primary-glow);
+      transition: transform 0.2s, filter 0.2s;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+      filter: brightness(0.9);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      box-shadow: none;
+      margin-top: -8px;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(52, 199, 89, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0); }
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="card">
+      <header>
+        <div class="logo-container">
+          <div class="logo-glow"></div>
+          <svg class="logo-svg" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="33" fill="none" stroke="currentColor" stroke-width="3" opacity=".5"/>
+            <circle cx="50" cy="50" r="22" fill="none" stroke="currentColor" stroke-width="3.6" opacity=".78"/>
+            <circle cx="50" cy="50" r="8.5" fill="currentColor"/>
+          </svg>
+        </div>
+        <h1>iOS BLE-MCP Bridge</h1>
+        <p class="subtitle">Bridges Web Bluetooth commands from AI agent to your iPhone's local radio.</p>
+      </header>
+
+      <!-- Connection Statuses -->
+      <div class="status-group">
+        <div class="status-row">
+          <span class="status-label">Bridge Server (WS)</span>
+          <span class="status-value">
+            <span id="ws-dot" class="status-dot inactive"></span>
+            <span id="ws-text">Disconnected</span>
+          </span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Safari Extension</span>
+          <span class="status-value">
+            <span id="ext-dot" class="status-dot inactive"></span>
+            <span id="ext-text">Checking...</span>
+          </span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Active BLE Device</span>
+          <span class="status-value">
+            <span id="ble-text">None</span>
+          </span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Background Keep-Alive (静音保活)</span>
+          <span class="status-value">
+            <span id="keepalive-dot" class="status-dot inactive"></span>
+            <button id="keepalive-btn" onclick="toggleKeepAlive()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 4px 10px; font-size: 12px; cursor: pointer;">Enable</button>
+          </span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">System Notification (系统通知)</span>
+          <span class="status-value">
+            <span id="notif-dot" class="status-dot inactive"></span>
+            <button id="notif-btn" onclick="requestNotificationPermission()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 4px 10px; font-size: 12px; cursor: pointer;">Enable</button>
+          </span>
+        </div>
+      </div>
+
+      <!-- Activity Console -->
+      <div class="log-container">
+        <h2 class="log-header">Activity Console</h2>
+        <div id="log-list" class="log-list">
+          <div class="log-item"><span class="log-time">[System]</span> Initializing bridge...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Permission Modal for User Gestures (Required by Web Bluetooth) -->
+  <div id="gesture-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-icon">🤖</div>
+      <div class="modal-title">AI Requesting BLE Scan</div>
+      <div class="modal-text">
+        The AI Agent is requesting to scan and pair with a Bluetooth device. Click the button below to approve and open the Bluetooth selector.
+      </div>
+      <button id="btn-approve" class="btn">Approve & Open Selector</button>
+      <button id="btn-cancel" class="btn btn-secondary">Cancel</button>
+    </div>
+  </div>
+
+  <script>
+    // State Variables
+    let ws = null;
+    let connectedDevice = null;
+    const logList = document.getElementById('log-list');
+    
+    // Store devices by ID for connection requests
+    const discoveredDevices = new Map();
+
+    // Hybrid Silent Audio Keep-Alive for iOS Safari background persistence
+    // Uses both HTML5 <audio> (for iOS Control Center media session) and WebAudio API
+    let keepAliveContext = null;
+    let keepAliveSource = null;
+    let keepAliveActive = false;
+
+    function toggleKeepAlive() {
+      const btn = document.getElementById('keepalive-btn');
+      const dot = document.getElementById('keepalive-dot');
+
+      if (keepAliveActive) {
+        // --- Stop Keep Alive ---
+        if (keepAliveSource) {
+          try { keepAliveSource.stop(); } catch (e) {}
+          keepAliveSource = null;
+        }
+        if (keepAliveContext) {
+          try { keepAliveContext.close(); } catch (e) {}
+          keepAliveContext = null;
+        }
+        keepAliveActive = false;
+        btn.textContent = 'Enable';
+        btn.style.background = 'rgba(255,255,255,0.1)';
+        btn.style.borderColor = 'rgba(255,255,255,0.2)';
+        btn.style.color = '#fff';
+        dot.className = 'status-dot inactive';
+        log('Background Keep-Alive disabled', 'sys');
+      } else {
+        // --- Start Keep Alive ---
+        // Web Audio API: programmatically generate a real 1-second silent PCM buffer.
+        // iOS recognizes an active AudioContext as "audio is playing" and keeps
+        // the page alive in the background. Must be called from a user gesture (button click). ✓
+        try {
+          keepAliveContext = new (window.AudioContext || window.webkitAudioContext)();
+          const sampleRate = keepAliveContext.sampleRate;
+          // createBuffer allocates a zero-filled Float32 buffer = perfect silence.
+          const buffer = keepAliveContext.createBuffer(1, sampleRate, sampleRate);
+          keepAliveSource = keepAliveContext.createBufferSource();
+          keepAliveSource.buffer = buffer;
+          keepAliveSource.loop = true;
+          keepAliveSource.connect(keepAliveContext.destination);
+          keepAliveSource.start(0);
+
+          keepAliveActive = true;
+          btn.textContent = 'Active';
+          btn.style.background = 'rgba(52, 199, 89, 0.2)';
+          btn.style.borderColor = '#34c759';
+          btn.style.color = '#34c759';
+          dot.className = 'status-dot active';
+          log('Background Keep-Alive enabled (silent AudioContext loop)', 'sys');
+        } catch (err) {
+          log(`Failed to start keep-alive: ${err.message || err}`, 'err');
+        }
+      }
+    }
+
+    // Web Notification Management
+    function requestNotificationPermission() {
+      if (!('Notification' in window)) {
+        log('System Notifications are not supported in this browser.', 'err');
+        return;
+      }
+      Notification.requestPermission().then(permission => {
+        updateNotificationUI(permission);
+        if (permission === 'granted') {
+          log('System Notifications enabled!', 'sys');
+        } else {
+          log('System Notifications permission denied.', 'err');
+        }
+      });
+    }
+
+    function checkNotificationStatus() {
+      if ('Notification' in window) {
+        updateNotificationUI(Notification.permission);
+      }
+    }
+
+    function updateNotificationUI(permission) {
+      const dot = document.getElementById('notif-dot');
+      const btn = document.getElementById('notif-btn');
+      if (permission === 'granted') {
+        dot.className = 'status-dot active';
+        btn.textContent = 'Active';
+        btn.style.background = 'rgba(52, 199, 89, 0.2)';
+        btn.style.borderColor = '#34c759';
+        btn.style.color = '#34c759';
+      } else {
+        dot.className = 'status-dot inactive';
+        btn.textContent = 'Enable';
+      }
+    }
+
+    // Auto-resume AudioContext and WebSocket when returning to foreground
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        if (keepAliveContext && keepAliveContext.state === 'suspended') {
+          keepAliveContext.resume().then(() => {
+            log('AudioContext resumed on foreground return', 'sys');
+          });
+        }
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          log('Re-checking WebSocket connection on foreground return...', 'sys');
+          connectWebSocket();
+        }
+      }
+    });
+
+    // Logger Utility
+    function log(message, type = 'sys') {
+      const item = document.createElement('div');
+      item.className = 'log-item';
+      
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'log-time';
+      timeSpan.textContent = `[${new Date().toLocaleTimeString()}]`;
+      item.appendChild(timeSpan);
+
+      if (type !== 'sys') {
+        const tagSpan = document.createElement('span');
+        tagSpan.className = `log-tag ${type}`;
+        tagSpan.textContent = type.toUpperCase();
+        item.appendChild(tagSpan);
+      }
+
+      const textNode = document.createTextNode(message);
+      item.appendChild(textNode);
+
+      logList.appendChild(item);
+      logList.scrollTop = logList.scrollHeight;
+    }
+
+    // Check Beacio Extension Status
+    function checkExtension() {
+      const extDot = document.getElementById('ext-dot');
+      const extText = document.getElementById('ext-text');
+
+      if (typeof navigator.bluetooth !== 'undefined') {
+        extDot.className = 'status-dot active';
+        extText.textContent = 'Active (beacio)';
+        log('Web Bluetooth is supported / extension active');
+      } else {
+        extDot.className = 'status-dot inactive';
+        extText.textContent = 'Not Found';
+        log('Web Bluetooth is undefined. Is beacio extension installed & allowed?', 'err');
+      }
+    }
+
+    // Connect to WebSocket Server
+    function connectWebSocket() {
+      const wsDot = document.getElementById('ws-dot');
+      const wsText = document.getElementById('ws-text');
+      
+      // Determine WebSocket protocol based on page protocol (wss for https)
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${window.location.host}`;
+
+      log(`Connecting to WebSocket server: ${wsUrl}...`);
+      
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        wsDot.className = 'status-dot active';
+        wsText.textContent = 'Connected';
+        log('Connected to Bridge Server', 'sys');
+      };
+
+      ws.onclose = () => {
+        wsDot.className = 'status-dot inactive';
+        wsText.textContent = 'Disconnected';
+        log('Disconnected from Bridge Server. Retrying in 3 seconds...', 'err');
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onerror = (err) => {
+        log('WebSocket error occurred', 'err');
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          const request = JSON.parse(event.data);
+          log(`Received: ${request.method}`, 'in');
+          
+          let result = null;
+          let error = null;
+
+          try {
+            result = await handleCommand(request.method, request.params);
+          } catch (err) {
+            error = err.message || String(err);
+            log(`Error executing ${request.method}: ${error}`, 'err');
+          }
+
+          // Send response back
+          ws.send(JSON.stringify({
+            id: request.id,
+            result,
+            error
+          }));
+        } catch (err) {
+          log(`Failed to process incoming command: ${err}`, 'err');
+        }
+      };
+    }
+
+    // Web Bluetooth & Command Handler
+    async function handleCommand(method, params) {
+      switch (method) {
+        case 'scan': {
+          return new Promise((resolve, reject) => {
+            // Trigger System Notification if Safari is in the background
+            if (document.visibilityState !== 'visible' && 'Notification' in window && Notification.permission === 'granted') {
+              try {
+                const notif = new Notification('🤖 AI 发起蓝牙扫描', {
+                  body: 'AI 正在请求连接蓝牙设备，请点击此处跳回 Safari 完成授权及设备选择。',
+                });
+                notif.onclick = () => {
+                  window.focus();
+                  notif.close();
+                };
+              } catch (e) {
+                console.log('Notification trigger error:', e);
+              }
+            }
+
+            // Show modal to capture user gesture
+            const modal = document.getElementById('gesture-modal');
+            const approveBtn = document.getElementById('btn-approve');
+            const cancelBtn = document.getElementById('btn-cancel');
+
+            modal.classList.add('show');
+
+            const cleanUp = () => {
+              modal.classList.remove('show');
+              approveBtn.onclick = null;
+              cancelBtn.onclick = null;
+            };
+
+            cancelBtn.onclick = () => {
+              cleanUp();
+              reject(new Error('User declined the BLE pairing request.'));
+            };
+
+            approveBtn.onclick = async () => {
+              cleanUp();
+              try {
+                log('Initiating Bluetooth device request dialog...', 'sys');
+                
+                // Format request services
+                // IMPORTANT: Web Bluetooth security requires services to be declared
+                // at requestDevice time via filters OR optionalServices. Without this,
+                // getPrimaryService() will throw a security error later.
+                const requestOptions = {};
+
+                if (params.services && params.services.length > 0) {
+                  requestOptions.filters = [{ services: params.services }];
+                } else {
+                  // acceptAllDevices: must still declare optionalServices if you
+                  // want to read/write any specific service later.
+                  requestOptions.acceptAllDevices = true;
+                  // Pass common well-known services as optional so they remain accessible:
+                  requestOptions.optionalServices = [
+                    'battery_service', 'heart_rate', 'device_information',
+                    'environmental_sensing', 'generic_attribute', 'generic_access',
+                    '0000ffe0-0000-1000-8000-00805f9b34fb', // HM-10 UART
+                    '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART
+                  ];
+                }
+
+                const device = await navigator.bluetooth.requestDevice(requestOptions);
+                log(`Successfully paired with device: ${device.name || 'Unnamed'} (${device.id})`, 'sys');
+                
+                // Store in memory (cap at 20 entries to prevent memory leaks)
+                discoveredDevices.set(device.id, device);
+                if (discoveredDevices.size > 20) {
+                  const firstKey = discoveredDevices.keys().next().value;
+                  discoveredDevices.delete(firstKey);
+                }
+
+                resolve({
+                  id: device.id,
+                  name: device.name || 'Unnamed Device',
+                });
+              } catch (err) {
+                reject(err);
+              }
+            };
+          });
+        }
+
+        case 'connect': {
+          const { deviceId, services } = params;
+          const device = discoveredDevices.get(deviceId);
+          if (!device) {
+            throw new Error(`Device ID ${deviceId} has not been paired. Please scan first.`);
+          }
+
+          log(`Connecting to GATT server on ${device.name || 'Device'}...`);
+          const server = await device.gatt.connect();
+          connectedDevice = device;
+          
+          document.getElementById('ble-text').textContent = device.name || 'Connected Device';
+          log(`Connected to GATT server successfully`, 'sys');
+
+          // Set disconnect listener
+          device.addEventListener('gattserverdisconnected', () => {
+            log('Device disconnected', 'err');
+            document.getElementById('ble-text').textContent = 'None';
+            connectedDevice = null;
+          });
+
+          return {
+            connected: true,
+            id: device.id,
+            name: device.name || 'Unnamed Device'
+          };
+        }
+
+        case 'read': {
+          const { deviceId, serviceUuid, characteristicUuid } = params;
+          const device = connectedDevice || discoveredDevices.get(deviceId);
+          if (!device || !device.gatt.connected) {
+            throw new Error('No active GATT connection to read from.');
+          }
+
+          log(`Getting primary service ${serviceUuid}...`);
+          const service = await device.gatt.getPrimaryService(serviceUuid);
+          
+          log(`Getting characteristic ${characteristicUuid}...`);
+          const characteristic = await service.getCharacteristic(characteristicUuid);
+          
+          log('Reading characteristic value...');
+          const dataView = await characteristic.readValue();
+          
+          // Convert DataView to hex string
+          const uint8Array = new Uint8Array(dataView.buffer);
+          const hex = Array.from(uint8Array).map(b => b.toString(16).padStart(2, '0')).join('');
+          
+          log(`Read successful: 0x${hex}`, 'out');
+          return { hex };
+        }
+
+        case 'write': {
+          const { deviceId, serviceUuid, characteristicUuid, valueHex } = params;
+          const device = connectedDevice || discoveredDevices.get(deviceId);
+          if (!device || !device.gatt.connected) {
+            throw new Error('No active GATT connection to write to.');
+          }
+
+          // Parse hex string to ArrayBuffer
+          const bytes = new Uint8Array(valueHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+
+          log(`Getting primary service ${serviceUuid}...`);
+          const service = await device.gatt.getPrimaryService(serviceUuid);
+          
+          log(`Getting characteristic ${characteristicUuid}...`);
+          const characteristic = await service.getCharacteristic(characteristicUuid);
+          
+          log(`Writing 0x${valueHex} to characteristic...`);
+          // Use writeValueWithResponse if available (modern API), fallback to writeValue
+          if (typeof characteristic.writeValueWithResponse === 'function') {
+            await characteristic.writeValueWithResponse(bytes);
+          } else {
+            await characteristic.writeValue(bytes);
+          }
+          
+          log('Write successful', 'out');
+          return { success: true };
+        }
+
+        default:
+          throw new Error(`Unsupported method: ${method}`);
+      }
+    }
+
+    // Initialize Page
+    window.addEventListener('DOMContentLoaded', () => {
+      checkExtension();
+      checkNotificationStatus();
+      connectWebSocket();
+    });
+  </script>
+</body>
+</html>
