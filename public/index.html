@@ -390,6 +390,13 @@
             <button id="notif-btn" onclick="requestNotificationPermission()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 4px 10px; font-size: 12px; cursor: pointer;">Enable</button>
           </span>
         </div>
+        <div class="status-row">
+          <span class="status-label">Mock BLE Mode (虚拟测试模式)</span>
+          <span class="status-value">
+            <span id="mock-dot" class="status-dot active"></span>
+            <button id="mock-btn" onclick="toggleMockMode()" style="background: rgba(52, 199, 89, 0.2); border: 1px solid #34c759; color: #34c759; border-radius: 8px; padding: 4px 10px; font-size: 12px; cursor: pointer;">Active (ON)</button>
+          </span>
+        </div>
       </div>
 
       <!-- Activity Console -->
@@ -419,10 +426,32 @@
     // State Variables
     let ws = null;
     let connectedDevice = null;
+    let mockMode = true; // Enabled by default for testing
     const logList = document.getElementById('log-list');
     
     // Store devices by ID for connection requests
     const discoveredDevices = new Map();
+
+    function toggleMockMode() {
+      mockMode = !mockMode;
+      const btn = document.getElementById('mock-btn');
+      const dot = document.getElementById('mock-dot');
+      if (mockMode) {
+        dot.className = 'status-dot active';
+        btn.textContent = 'Active (ON)';
+        btn.style.background = 'rgba(52, 199, 89, 0.2)';
+        btn.style.borderColor = '#34c759';
+        btn.style.color = '#34c759';
+        log('Mock Mode Enabled: Simulated BLE device test111 ready', 'sys');
+      } else {
+        dot.className = 'status-dot inactive';
+        btn.textContent = 'Disabled';
+        btn.style.background = 'rgba(255, 255, 255, 0.1)';
+        btn.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+        btn.style.color = '#fff';
+        log('Mock Mode Disabled: Using real Web Bluetooth API', 'sys');
+      }
+    }
 
     // Hybrid Silent Audio Keep-Alive for iOS Safari background persistence
     // Uses both HTML5 <audio> (for iOS Control Center media session) and WebAudio API
@@ -631,6 +660,49 @@
 
     // Web Bluetooth & Command Handler
     async function handleCommand(method, params) {
+      if (mockMode) {
+        log(`[MOCK MODE] Intercepted command '${method}'`, 'out');
+        switch (method) {
+          case 'scan': {
+            const mockDevice = {
+              id: 'mock-device-test111',
+              name: 'test111 (Mock BLE Sensor)',
+              isMock: true
+            };
+            discoveredDevices.set(mockDevice.id, mockDevice);
+            log(`[MOCK MODE] Discovered virtual BLE device: ${mockDevice.name} (${mockDevice.id})`, 'sys');
+            return {
+              id: mockDevice.id,
+              name: mockDevice.name
+            };
+          }
+          case 'connect': {
+            const { deviceId } = params;
+            document.getElementById('ble-text').textContent = 'test111 (Mock BLE Sensor)';
+            log(`[MOCK MODE] Connected to virtual GATT server test111`, 'sys');
+            return {
+              connected: true,
+              id: deviceId || 'mock-device-test111',
+              name: 'test111 (Mock BLE Sensor)'
+            };
+          }
+          case 'read': {
+            const { serviceUuid, characteristicUuid } = params;
+            let mockHex = "004b"; // Default 75 bpm for heart rate
+            if (String(serviceUuid).includes('180f') || String(serviceUuid).includes('battery')) {
+              mockHex = "64"; // 100% battery level
+            }
+            log(`[MOCK MODE] Read service '${serviceUuid}', char '${characteristicUuid}' -> Hex: 0x${mockHex}`, 'out');
+            return { hex: mockHex, serviceUuid, characteristicUuid };
+          }
+          case 'write': {
+            const { serviceUuid, characteristicUuid, valueHex } = params;
+            log(`[MOCK MODE] Wrote 0x${valueHex} to service '${serviceUuid}', char '${characteristicUuid}'`, 'out');
+            return { success: true, writtenHex: valueHex };
+          }
+        }
+      }
+
       switch (method) {
         case 'scan': {
           return new Promise((resolve, reject) => {
@@ -677,20 +749,25 @@
                 // at requestDevice time via filters OR optionalServices. Without this,
                 // getPrimaryService() will throw a security error later.
                 const requestOptions = {};
+                const defaultServices = [
+                  'heart_rate', 'battery_service', 'device_information',
+                  'environmental_sensing', 'generic_attribute', 'generic_access',
+                  '180d', '180f', '180a',
+                  '0000180d-0000-1000-8000-00805f9b34fb',
+                  '0000180f-0000-1000-8000-00805f9b34fb',
+                  '0000ffe0-0000-1000-8000-00805f9b34fb',
+                  '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+                ];
+
+                const userServices = (params.services || []).map(s => String(s).toLowerCase());
+                const combinedOptional = Array.from(new Set([...defaultServices, ...userServices]));
 
                 if (params.services && params.services.length > 0) {
                   requestOptions.filters = [{ services: params.services }];
+                  requestOptions.optionalServices = combinedOptional;
                 } else {
-                  // acceptAllDevices: must still declare optionalServices if you
-                  // want to read/write any specific service later.
                   requestOptions.acceptAllDevices = true;
-                  // Pass common well-known services as optional so they remain accessible:
-                  requestOptions.optionalServices = [
-                    'battery_service', 'heart_rate', 'device_information',
-                    'environmental_sensing', 'generic_attribute', 'generic_access',
-                    '0000ffe0-0000-1000-8000-00805f9b34fb', // HM-10 UART
-                    '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART
-                  ];
+                  requestOptions.optionalServices = combinedOptional;
                 }
 
                 const device = await navigator.bluetooth.requestDevice(requestOptions);
